@@ -1,3 +1,7 @@
+// Frontend type definitions — these mirror the backend Pydantic schemas exactly.
+// If you change a model on the FastAPI side, update it here too or things will break.
+
+// a single point on the grid map; delivery houses have is_delivery_point = true
 export interface Node {
     id: number;
     x: number;
@@ -6,6 +10,7 @@ export interface Node {
     address: string;
   }
 
+  // restaurant sitting on a specific node — the place where bots pick up food
   export interface Restaurant {
     id: number;
     name: string;
@@ -15,12 +20,14 @@ export interface Node {
     address: string;
   }
 
+  // an edge between two nodes that bots can't travel through (obstacle)
   export interface BlockedEdge {
     id: number;
     from_node_id: number;
     to_node_id: number;
   }
 
+  // delivery bot — tracks position, status, current route, and what it's working on
   export interface Bot {
     id: number;
     name: string;
@@ -37,6 +44,7 @@ export interface Node {
     active_orders: number;
   }
 
+  // a food delivery order — goes through PENDING -> ASSIGNED -> PICKED_UP -> DELIVERED
   export interface Order {
     id: number;
     restaurant_id: number;
@@ -50,6 +58,7 @@ export interface Node {
     status: "PENDING" | "ASSIGNED" | "PICKED_UP" | "DELIVERED" | "CANCELLED";
   }
 
+  // the full grid layout returned by GET /api/grid — used for the interactive map visualization
   export interface Grid {
     nodes: Node[];
     restaurants: Restaurant[];
@@ -57,6 +66,7 @@ export interface Node {
     delivery_points: Node[];
   }
 
+  // snapshot of the simulation state — powers the stats row and running/idle indicator
   export interface SimulationStatus {
     is_running: boolean;
     tick_count: number;

@@ -1,4 +1,4 @@
-# blocked edge schemas
+# schema for blocked edges -- these are grid connections bots can't travel through (think road closures)
 
 from pydantic import BaseModel
 

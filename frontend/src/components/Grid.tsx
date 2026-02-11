@@ -1,8 +1,14 @@
+// Interactive map visualization (assignment requirement).
+// Renders the grid with nodes, restaurants (food emojis), delivery houses, and animated bots.
+// Each cell shows what's currently on it — a bot, a restaurant, a delivery house, or just an empty node.
 "use client";
 import type { BlockedEdge, Bot, Node, Restaurant } from "@/lib/types";
 
 type StackPos = { x: number; y: number };
 
+// Multiple bots can occupy the same cell at once (e.g. two idle bots at origin).
+// These layouts define how to arrange 1-5 bots inside a single cell so they
+// don't overlap — think of it like a little formation pattern per count.
 const BOT_STACK_LAYOUTS: Record<number, StackPos[]> = {
   1: [{ x: 0, y: 0 }],
 
@@ -24,6 +30,7 @@ const BOT_STACK_LAYOUTS: Record<number, StackPos[]> = {
     { x: 0.5, y: 0.5 },
   ],
 
+  // 5 is also the fallback for 6+ bots (we just show the first 5)
   5: [
     { x: -0.5, y: -0.5 },
     { x: 0.5, y: -0.5 },
@@ -41,6 +48,7 @@ export type GridProps = {
   cellSize?: number; // allow parent to control cell size
 };
 
+// map restaurant name to a food emoji — makes the grid more visual and fun
 const RESTAURANT_EMOJI: Record<string, string> = {
   RAMEN: "\u{1F35C}",
   CURRY: "\u{1F35B}",
@@ -63,9 +71,10 @@ export default function Grid({
   bots,
   cellSize = 56,
 }: GridProps) {
-  void blockedEdges;
+  void blockedEdges; // not rendered yet but accepted as a prop for future use
   const CELL = cellSize;
 
+  // figure out the grid boundaries from node coordinates
   const xs = nodes.map((n) => n.x);
   const ys = nodes.map((n) => n.y);
   const minX = xs.length ? Math.min(...xs) : 0;
@@ -73,6 +82,7 @@ export default function Grid({
   const minY = ys.length ? Math.min(...ys) : 0;
   const maxY = ys.length ? Math.max(...ys) : 0;
 
+  // build quick lookup maps so we don't scan arrays repeatedly while rendering
   const nodeByXY = new Map<string, Node>();
   for (const n of nodes) nodeByXY.set(`${n.x},${n.y}`, n);
 
@@ -87,6 +97,7 @@ export default function Grid({
     botsByNodeId.set(b.current_node_id, existing);
   }
 
+  // build a 2D array of rows for rendering — null means empty/no-node cell
   const rows: Array<Array<Node | null>> = [];
   for (let y = minY; y <= maxY; y++) {
     const row: Array<Node | null> = [];
@@ -95,7 +106,7 @@ export default function Grid({
     rows.push(row);
   }
 
-  // scale bot/emoji sizes relative to cell size
+  // scale bot circles and emoji sizes relative to the cell size so it looks good at any zoom
   const botSingle = Math.round(CELL * 0.6);
   const botStacked = Math.round(CELL * 0.4);
   const fontSingle = Math.round(CELL * 0.25);
@@ -156,7 +167,7 @@ export default function Grid({
             const nodeBots = botsByNodeId.get(node.id) || [];
             const hasBot = nodeBots.length > 0;
 
-            // pick cell style based on what's on it
+            // pick cell background and border based on what's sitting on this node
             let bg = "var(--bg-elevated)";
             let border = "var(--border-subtle)";
             if (hasBot) {

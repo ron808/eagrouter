@@ -1,4 +1,4 @@
-# delivery bot - autonomous robot that picks up and delivers orders
+# delivery bot — total bots = 5, every bot can have max 3 orders at once (from the assignment spec)
 
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum
 from sqlalchemy.orm import relationship
@@ -27,7 +27,7 @@ class Bot(Base):
     max_capacity = Column(Integer, default=3, nullable=False)
 
     current_node = relationship("Node")
-    # only includes active orders (assigned/picked_up), not delivered
+    # only active orders here (ASSIGNED/PICKED_UP), delivered ones don't count toward capacity
     orders = relationship(
         "Order",
         back_populates="bot",
@@ -53,7 +53,7 @@ class Bot(Base):
 
     @property
     def is_available(self) -> bool:
-        # bot needs capacity and must be idle or already moving
+        # a bot is available if it has capacity (< 3 active orders) and is idle or already moving
         return self.has_capacity and self.status in (BotStatus.IDLE, BotStatus.MOVING)
 
     def __repr__(self):

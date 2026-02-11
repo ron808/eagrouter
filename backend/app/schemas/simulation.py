@@ -1,4 +1,4 @@
-# simulation schemas
+# real-time simulation status snapshot -- the frontend polls this to show live delivery progress
 
 from pydantic import BaseModel
 

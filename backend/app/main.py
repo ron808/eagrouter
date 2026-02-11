@@ -1,4 +1,4 @@
-# app entry point
+# EagRoute API — main entry point for the route optimization delivery bot system (FastAPI backend)
 import time
 import logging
 from contextlib import asynccontextmanager
@@ -19,13 +19,13 @@ logger = logging.getLogger("eagroute")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # runs on startup and shutdown
+    # on startup: run DB migrations (alembic), then load the CSV map data (nodes, restaurants, bots, blocked paths) into postgres
     logger.info("Starting EagRoute API...")
 
-    # let alembic handle all schema creation/updates
     run_migrations()
     logger.info("Database tables ready")
 
+    # reads sample_data.csv and BlockedPaths.csv, creates 5 bots — safe to call multiple times, skips if data already exists
     db = SessionLocal()
     try:
         load_initial_data(db)
@@ -42,16 +42,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Route Optimization Delivery Bot System",
+    description="Route Optimization Delivery Bot System — an eco-friendly autonomous food delivery service",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# middleware order matters! fastapi runs them in reverse order of how
-# they're added, so security goes first, then cors wraps around it.
-# this way cors headers always get set, even on rate-limited responses.
+# middleware runs in reverse order: security first, then CORS wraps it so CORS headers always get set even on blocked requests
 app.add_middleware(SecurityMiddleware)
 app.add_middleware(
     CORSMiddleware,
@@ -64,7 +62,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
-    # logs request info + how long it took
+    # logs every request with how long it took — handy for spotting slow endpoints
     start = time.time()
     response = await call_next(request)
     ms = round((time.time() - start) * 1000, 2)
@@ -72,7 +70,7 @@ async def request_logging_middleware(request: Request, call_next):
     return response
 
 
-# global error handlers so we never leak raw tracebacks to the client
+# catch errors globally so we never leak raw python tracebacks to the frontend
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
     return JSONResponse(
@@ -93,6 +91,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
+# health check endpoints — quick way to verify the API is alive
 @app.get("/", tags=["Health"])
 def root():
     return {"status": "ok", "message": "EagRoute API is running", "version": "1.0.0"}
@@ -103,7 +102,7 @@ def health_check():
     return {"status": "healthy", "environment": settings.ENVIRONMENT}
 
 
-# routers
+# register all route groups: grid (map data), bots, orders (full CRUD), and simulation (tick-based engine)
 app.include_router(grid_router, prefix="/api/grid", tags=["Grid"])
 app.include_router(bots_router, prefix="/api/bots", tags=["Bots"])
 app.include_router(orders_router, prefix="/api/orders", tags=["Orders"])

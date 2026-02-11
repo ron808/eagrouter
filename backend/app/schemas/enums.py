@@ -1,5 +1,4 @@
-# shared enums used across the pydantic schemas
-# these mirror the sqlalchemy enums but live on the API side
+# API-side enums that mirror our SQLAlchemy enums -- shared across all pydantic schemas
 
 from enum import Enum
 

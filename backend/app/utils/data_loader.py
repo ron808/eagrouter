@@ -1,4 +1,5 @@
-# loads csv data into the database on startup
+# loads initial data from CSV files into the database on startup
+# reads from sample_data.csv (nodes, restaurants, delivery points) and BlockedPaths.csv (blocked edges)
 
 import csv
 import os
@@ -10,6 +11,7 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__
 
 
 def load_nodes(db: Session) -> int:
+    # loads grid nodes from sample_data.csv -- each row has id, x, y, and whether it's a valid delivery point
     existing_count = db.query(Node).count()
     if existing_count > 0:
         print(f"  Nodes already loaded ({existing_count})")
@@ -42,6 +44,8 @@ def load_nodes(db: Session) -> int:
 
 
 def load_restaurants(db: Session) -> int:
+    # reads sample_data.csv and creates a restaurant wherever a column (RAMEN, CURRY, etc.) is TRUE
+    # these are the picking-up positions from the spec
     existing_count = db.query(Restaurant).count()
     if existing_count > 0:
         print(f"  Restaurants already loaded ({existing_count})")
@@ -78,6 +82,7 @@ def load_restaurants(db: Session) -> int:
 
 
 def load_blocked_edges(db: Session) -> int:
+    # loads blocked edges from BlockedPaths.csv -- these are paths bots can't travel through
     existing_count = db.query(BlockedEdge).count()
     if existing_count > 0:
         print(f"  Blocked edges already loaded ({existing_count})")
@@ -108,12 +113,13 @@ def load_blocked_edges(db: Session) -> int:
 
 
 def create_bots(db: Session, num_bots: int = 5) -> int:
+    # per the spec: "Total Bots = 5" -- creates 5 delivery bots starting near the center of the grid
     existing_count = db.query(Bot).count()
     if existing_count > 0:
         print(f"  Bots already created ({existing_count})")
         return 0
 
-    # try to start bots near the center of the grid
+    # try to place bots near the center so they're roughly equidistant from everything
     center_node = db.query(Node).filter(Node.x == 4, Node.y == 4).first()
 
     if not center_node:
@@ -140,7 +146,7 @@ def create_bots(db: Session, num_bots: int = 5) -> int:
 
 
 def load_initial_data(db: Session) -> dict:
-    # safe to call multiple times, skips if data exists
+    # safe to call multiple times -- skips anything that's already been loaded
     print("Loading initial data...")
 
     print("  Loading nodes...")

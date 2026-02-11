@@ -1,3 +1,7 @@
+# simulation control endpoints -- start, stop, reset, and tick the delivery simulation
+# per the spec: "View real-time updates on delivery status"
+# the frontend polls /tick and /bots/positions to show live bot movement on the grid
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from typing import Dict, List
@@ -25,6 +29,7 @@ def get_simulation_service(db: Session) -> SimulationService:
 
 @router.get("/status", response_model=SimulationStatus)
 def get_simulation_status(db: Session = Depends(get_db)):
+    # gives the frontend a snapshot of the whole simulation state
     total_orders = db.query(Order).count()
     pending_orders = db.query(Order).filter(Order.status == OrderStatus.PENDING).count()
     delivered_orders = db.query(Order).filter(Order.status == OrderStatus.DELIVERED).count()
@@ -54,10 +59,11 @@ def stop_simulation():
 
 @router.post("/reset")
 def reset_simulation(db: Session = Depends(get_db)):
+    # wipes the slate clean -- cancels in-flight orders, resets bots to idle at start position
     simulation_state["is_running"] = False
     simulation_state["tick_count"] = 0
 
-    # clear the restaurant cooldown and tick counter too
+    # clear the restaurant cooldown tracking and tick counter too
     SimulationService._tick_counter = 0
     SimulationService._restaurant_order_log = {}
 
@@ -81,7 +87,7 @@ def reset_simulation(db: Session = Depends(get_db)):
 
 @router.post("/tick")
 def simulation_tick(db: Session = Depends(get_db)):
-    # each tick: assign orders, move bots, handle pickups/deliveries
+    # one tick = assign orders -> calculate routes -> move bots -> handle pickups/deliveries
     if not simulation_state["is_running"]:
         return {
             "message": "Simulation is not running",
@@ -103,6 +109,7 @@ def simulation_tick(db: Session = Depends(get_db)):
 
 @router.get("/bots/positions")
 def get_bot_positions(db: Session = Depends(get_db)):
+    # real-time bot positions, routes, and targets for the frontend map display
     service = get_simulation_service(db)
     bots = db.query(Bot).all()
 

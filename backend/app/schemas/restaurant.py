@@ -1,4 +1,4 @@
-# restaurant schemas
+# response schema for restaurants -- each restaurant sits on exactly one grid node
 
 from pydantic import BaseModel
 from typing import Optional

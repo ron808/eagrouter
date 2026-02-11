@@ -1,5 +1,4 @@
-# add postgres triggers for the order status history audit trail
-# these fire automatically on insert/update so we never miss a status change
+# postgres triggers that auto-log every order status change into the audit trail so we never miss one
 
 from typing import Sequence, Union
 from alembic import op

@@ -1,3 +1,5 @@
+# order CRUD endpoints -- handles Create, Read, Update, Delete as required by the assignment
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -18,7 +20,7 @@ RESTAURANT_WINDOW_SECONDS = 30
 
 
 def _order_response(o: Order) -> OrderResponse:
-    # builds response with LR address format included
+    # builds the response with the LR address format included for frontend display
     return OrderResponse(
         id=o.id,
         restaurant_id=o.restaurant_id,
@@ -37,6 +39,7 @@ def _order_response(o: Order) -> OrderResponse:
     )
 
 
+# READ -- list orders with optional status filter
 @router.get("", response_model=List[OrderResponse])
 def get_orders(
     status: Optional[str] = None,
@@ -56,15 +59,14 @@ def get_orders(
     return [_order_response(o) for o in orders]
 
 
+# CREATE -- place a new order at a restaurant
 @router.post("", response_model=OrderResponse, status_code=201)
 def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     restaurant = db.query(Restaurant).filter(Restaurant.id == order_data.restaurant_id).first()
     if not restaurant:
         raise HTTPException(status_code=404, detail="Restaurant not found")
 
-    # ── restaurant rate limit: max 3 orders created within any 30s window ──
-    # this is a pure time-based rate limit — doesn't matter if orders got
-    # delivered or cancelled, the restaurant still needs the cooldown
+    # restaurant rate limit: max 3 orders per 30s window — doesn't matter if orders got delivered or cancelled, the cooldown still applies
     window_start = datetime.utcnow() - timedelta(seconds=RESTAURANT_WINDOW_SECONDS)
     recent_count = db.query(Order).filter(
         Order.restaurant_id == restaurant.id,
@@ -97,11 +99,13 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(order)
 
+    # try to assign a bot right away so the user doesn't have to wait for the next tick
     try_assign_order(order, db)
 
     return _order_response(order)
 
 
+# READ -- get a single order by id
 @router.get("/{order_id}", response_model=OrderResponse)
 def get_order(order_id: int, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
@@ -110,10 +114,10 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
     return _order_response(order)
 
 
+# UPDATE -- change delivery location (only while pending) or update status
 @router.put("/{order_id}", response_model=OrderResponse)
 def update_order(order_id: int, update_data: OrderUpdate, db: Session = Depends(get_db)):
-    # only pending orders can change delivery location,
-    # and delivered/cancelled orders can't be touched at all
+    # only pending orders can change delivery location, and delivered/cancelled orders can't be touched at all
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -144,6 +148,7 @@ def update_order(order_id: int, update_data: OrderUpdate, db: Session = Depends(
     return _order_response(order)
 
 
+# DELETE -- cancel an order (only if it hasn't been picked up yet)
 @router.delete("/{order_id}", status_code=204)
 def cancel_order(order_id: int, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
@@ -156,7 +161,7 @@ def cancel_order(order_id: int, db: Session = Depends(get_db)):
             detail=f"Cannot cancel order with status {order.status.value}",
         )
 
-    # if this was the bot's only active order, set it back to idle
+    # if this was the bot's only active order, free it up so it can take new ones
     if order.bot_id:
         other_orders = db.query(Order).filter(
             Order.bot_id == order.bot_id,
@@ -199,7 +204,7 @@ def get_order_history(order_id: int, db: Session = Depends(get_db)):
 
 
 def try_assign_order(order: Order, db: Session) -> bool:
-    # try to immediately assign to the least-loaded idle/moving bot
+    # tries to immediately assign the order to the least-loaded idle/moving bot so it doesn't have to wait for the next simulation tick
     bots = db.query(Bot).filter(
         Bot.status.in_([BotStatus.IDLE, BotStatus.MOVING])
     ).all()
@@ -213,11 +218,11 @@ def try_assign_order(order: Order, db: Session) -> bool:
             Order.status.in_([OrderStatus.ASSIGNED, OrderStatus.PICKED_UP]),
         ).count()
 
-        # strictly respect the capacity limit
+        # strictly respect the bot's capacity limit
         if current_orders >= bot.max_capacity:
             continue
 
-        # prefer the bot with the fewest active orders (spread the load)
+        # prefer the bot with the fewest active orders to spread the load evenly
         if current_orders < best_load:
             best_load = current_orders
             best_bot = bot
@@ -233,5 +238,5 @@ def try_assign_order(order: Order, db: Session) -> bool:
         db.commit()
         return True
 
-    # no bot available, stays PENDING until the simulation assigns it
+    # no bot available right now -- stays PENDING until the simulation assigns it
     return False

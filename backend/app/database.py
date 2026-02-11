@@ -1,4 +1,4 @@
-# database connection setup
+# db connection and migration setup — all schema changes go through alembic migrations, not create_all()
 import logging
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -26,7 +26,7 @@ Base = declarative_base()
 
 
 def get_db():
-    # fastapi dependency - yields a db session and closes it after
+    # fastapi dependency — gives you a db session and auto-closes it when the request is done
     db = SessionLocal()
     try:
         yield db
@@ -43,8 +43,7 @@ def _get_alembic_config():
 
 
 def run_migrations():
-    # run alembic migrations programmatically instead of using create_all()
-    # this way the db schema is always managed through versioned migration files
+    # run alembic migrations on startup so the db schema stays in sync with our versioned migration files
     from sqlalchemy import inspect, text
 
     alembic_cfg = _get_alembic_config()
@@ -55,15 +54,13 @@ def run_migrations():
     has_app_tables = "nodes" in existing_tables
 
     if has_app_tables and not has_alembic_version:
-        # tables were created by the old create_all() approach but alembic
-        # has never run before. stamp the db so alembic knows where we are,
-        # then run any new migrations on top (like the triggers in 002)
+        # tables exist but alembic hasn't tracked them yet — stamp to 001 so alembic knows where we are, then run any new migrations
         logger.info("Existing tables found without alembic history - stamping to 001...")
         command.stamp(alembic_cfg, "001")
         logger.info("Stamped. Now running any pending migrations...")
         command.upgrade(alembic_cfg, "head")
     else:
-        # normal case: either fresh db or alembic is already tracking it
+        # normal path: fresh db or alembic is already tracking things
         logger.info("Running alembic migrations...")
         command.upgrade(alembic_cfg, "head")
 

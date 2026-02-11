@@ -1,4 +1,4 @@
-# blocked edge - impassable path between two nodes, bidirectional
+# blocked edge — impassable path between two adjacent nodes, loaded from BlockedPaths.csv per the assignment
 
 from sqlalchemy import Column, Integer, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
@@ -25,7 +25,7 @@ class BlockedEdge(Base):
     from_node = relationship("Node", foreign_keys=[from_node_id])
     to_node = relationship("Node", foreign_keys=[to_node_id])
 
-    # we only store each edge once (from < to), pathfinding checks both directions
+    # we store each blocked edge once (from < to), pathfinding checks both directions
     __table_args__ = (
         UniqueConstraint('from_node_id', 'to_node_id', name='unique_blocked_edge'),
         Index('idx_blocked_edge_lookup', 'from_node_id', 'to_node_id'),
@@ -51,5 +51,5 @@ class BlockedEdge(Base):
 
     @staticmethod
     def is_blocked(from_id: int, to_id: int, blocked_set: set) -> bool:
-        # checks both directions since edges are bidirectional
+        # checks both directions — if A->B is blocked, B->A is blocked too
         return (from_id, to_id) in blocked_set or (to_id, from_id) in blocked_set

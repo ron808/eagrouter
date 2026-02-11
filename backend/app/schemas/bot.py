@@ -1,4 +1,4 @@
-# bot schemas
+# response schema for delivery bots -- includes position, capacity, and current workload
 
 from pydantic import BaseModel
 from typing import Optional

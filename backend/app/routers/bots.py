@@ -1,3 +1,6 @@
+# bot endpoints -- per the spec, "Total Bots = 5" and each bot has a capacity and status
+# these endpoints let the frontend check on bot positions, capacity, and active orders
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -12,6 +15,7 @@ router = APIRouter()
 
 @router.get("", response_model=List[BotResponse])
 def get_bots(db: Session = Depends(get_db)):
+    # returns all bots with their current order counts and available capacity
     bots = db.query(Bot).all()
 
     responses = []
@@ -62,6 +66,7 @@ def get_bot(bot_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{bot_id}/orders", response_model=List[OrderResponse])
 def get_bot_orders(bot_id: int, db: Session = Depends(get_db)):
+    # returns the orders this bot is currently working on (assigned or picked up)
     bot = db.query(Bot).filter(Bot.id == bot_id).first()
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")

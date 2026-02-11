@@ -1,4 +1,4 @@
-# order - customer food delivery request, goes through PENDING -> ASSIGNED -> PICKED_UP -> DELIVERED
+# order — a food delivery request, lifecycle: PENDING -> ASSIGNED -> PICKED_UP -> DELIVERED (or CANCELLED)
 
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, func
 from sqlalchemy.orm import relationship
@@ -50,7 +50,7 @@ class Order(Base):
         index=True
     )
 
-    # timestamps for each lifecycle stage
+    # timestamps for tracking each stage of the order lifecycle
     created_at = Column(
         DateTime,
         default=func.now(),

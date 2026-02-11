@@ -1,4 +1,4 @@
-# order schemas - create, update, response, and status history
+# CRUD schemas for orders (assignment req: "Create order CRUD Form") -- covers create, update, read, and status history
 
 from pydantic import BaseModel
 from typing import Optional

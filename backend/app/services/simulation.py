@@ -1,5 +1,5 @@
-# runs the delivery simulation tick by tick:
-# assign orders -> calculate routes -> move bots -> handle pickups/deliveries
+# the heart of the delivery simulation -- runs tick by tick
+# each tick: assign orders -> calculate routes -> move bots -> handle pickups/deliveries
 
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -10,16 +10,15 @@ from app.models.bot import BotStatus
 from app.models.order import OrderStatus
 from app.services.pathfinding import PathfindingService
 
-# restaurants can only handle 3 orders every 30 ticks
-# this prevents spamming one restaurant with a ton of orders at once
+# per the spec: "Restaurants = Can receive order (3order/30sec)"
+# so each restaurant can only accept 3 orders within a 30-tick window
 RESTAURANT_ORDER_LIMIT = 3
 RESTAURANT_COOLDOWN_TICKS = 30
 
 
 class SimulationService:
 
-    # track tick count and restaurant order history across ticks
-    # class-level so it persists between service instantiations
+    # class-level state so it persists between service instantiations across ticks
     _tick_counter: int = 0
     _restaurant_order_log: Dict[int, List[int]] = {}
 
@@ -27,7 +26,7 @@ class SimulationService:
         self.db = db
         self.pathfinder = PathfindingService(db)
         self._bot_routes: Dict[int, List[int]] = {}
-        # target is (node_id, 'PICKUP'|'DELIVER', order_id)
+        # each target is (node_id, 'PICKUP'|'DELIVER', order_id)
         self._bot_targets: Dict[int, tuple] = {}
 
     def tick(self) -> Dict:
@@ -40,9 +39,13 @@ class SimulationService:
             "bots_moved": 0,
         }
 
+        # phase 1: match pending orders to available bots
         results["orders_assigned"] = self._assign_pending_orders()
+        # phase 2: figure out where each bot needs to go next
         self._calculate_bot_routes()
 
+        # phase 3: move bots one step and handle any arrivals (pickups/deliveries)
+        # per spec: "No waiting time at pick up location or destination location"
         move_results = self._move_bots()
         results["bots_moved"] = move_results["moved"]
         results["orders_picked_up"] = move_results["picked_up"]
@@ -51,11 +54,11 @@ class SimulationService:
         return results
 
     def _get_restaurant_orders_in_window(self, restaurant_id: int) -> int:
-        # how many orders this restaurant got assigned in the last N ticks
+        # checks how many orders this restaurant got assigned in the last N ticks
         current_tick = SimulationService._tick_counter
         log = SimulationService._restaurant_order_log.get(restaurant_id, [])
 
-        # only count ticks within the cooldown window
+        # toss out anything outside the cooldown window
         recent = [t for t in log if current_tick - t < RESTAURANT_COOLDOWN_TICKS]
         SimulationService._restaurant_order_log[restaurant_id] = recent
         return len(recent)
@@ -67,21 +70,20 @@ class SimulationService:
         SimulationService._restaurant_order_log[restaurant_id].append(current_tick)
 
     def _assign_pending_orders(self) -> int:
-        # assign each pending order to the closest bot that actually has room
+        # finds the closest available bot for each pending order
         assigned = 0
 
         pending_orders = self.db.query(Order).filter(
             Order.status == OrderStatus.PENDING
         ).all()
 
-        # track how many we assign to each bot THIS tick so we don't
-        # blow past capacity by assigning multiple in the same loop
+        # we track how many orders we assign to each bot THIS tick so we don't
+        # accidentally blow past their capacity by assigning multiple in one loop
         extra_assignments: Dict[int, int] = {}
 
         for order in pending_orders:
-            # check restaurant cooldown first
+            # enforce the restaurant rate limit (3order/30sec from spec)
             if self._get_restaurant_orders_in_window(order.restaurant_id) >= RESTAURANT_ORDER_LIMIT:
-                # this restaurant is at capacity, skip for now
                 continue
 
             available_bots = self.db.query(Bot).filter(
@@ -92,7 +94,7 @@ class SimulationService:
             best_distance = float('inf')
 
             for bot in available_bots:
-                # count orders already in the db
+                # count orders already committed in the db
                 db_orders = self.db.query(Order).filter(
                     Order.bot_id == bot.id,
                     Order.status.in_([OrderStatus.ASSIGNED, OrderStatus.PICKED_UP])
@@ -122,7 +124,7 @@ class SimulationService:
                 if best_bot.status == BotStatus.IDLE:
                     best_bot.status = BotStatus.MOVING
 
-                # track this assignment so the next iteration knows about it
+                # remember this assignment so the next iteration sees it
                 extra_assignments[best_bot.id] = extra_assignments.get(best_bot.id, 0) + 1
                 self._log_restaurant_order(order.restaurant_id)
                 assigned += 1
@@ -131,7 +133,7 @@ class SimulationService:
         return assigned
 
     def _calculate_bot_routes(self):
-        # pick up assigned orders first, then deliver picked-up ones
+        # figures out the next destination for each bot -- pickups first, then deliveries
         bots = self.db.query(Bot).filter(
             Bot.status.in_([BotStatus.MOVING, BotStatus.IDLE])
         ).all()
@@ -158,7 +160,7 @@ class SimulationService:
             target_order = None
 
             if assigned_orders:
-                # head to closest restaurant
+                # head to the closest restaurant to pick up
                 closest_order = min(
                     assigned_orders,
                     key=lambda o: self.pathfinder.get_path_length(
@@ -169,7 +171,7 @@ class SimulationService:
                 action = "PICKUP"
                 target_order = closest_order
             elif picked_up_orders:
-                # head to closest delivery point
+                # all pickups done, head to the closest delivery point
                 closest_order = min(
                     picked_up_orders,
                     key=lambda o: self.pathfinder.get_path_length(
@@ -189,7 +191,7 @@ class SimulationService:
         self.db.commit()
 
     def _move_bots(self) -> Dict:
-        # advance each moving bot one step along its route
+        # advances each moving bot one step along its route (one node per tick)
         results = {"moved": 0, "picked_up": 0, "delivered": 0}
 
         bots = self.db.query(Bot).filter(
@@ -216,6 +218,7 @@ class SimulationService:
         return results
 
     def _handle_arrival(self, bot: Bot, results: Dict):
+        # bot reached its target -- pick up or deliver with no waiting time (per spec)
         target_info = self._bot_targets.get(bot.id)
         if not target_info:
             return
@@ -226,7 +229,7 @@ class SimulationService:
             return
 
         if action == "PICKUP":
-            # grab all assigned orders at this restaurant node
+            # grab all assigned orders at this restaurant node at once
             orders = self.db.query(Order).filter(
                 Order.bot_id == bot.id,
                 Order.status == OrderStatus.ASSIGNED,
@@ -241,7 +244,7 @@ class SimulationService:
             bot.status = BotStatus.PICKING_UP
 
         elif action == "DELIVER":
-            # drop off all picked-up orders for this location
+            # drop off all picked-up orders headed to this location
             orders = self.db.query(Order).filter(
                 Order.bot_id == bot.id,
                 Order.status == OrderStatus.PICKED_UP,
@@ -255,7 +258,7 @@ class SimulationService:
 
             bot.status = BotStatus.DELIVERING
 
-        # clear target so it recalculates next tick
+        # clear target so the bot recalculates its next move on the following tick
         del self._bot_targets[bot.id]
         self._bot_routes[bot.id] = []
 

@@ -1,6 +1,9 @@
-version: '3.8'
+version: '3.82'
+
+# Note: I have not created .env files anywhere, just because i want the process for you to be as smooth as possible, adding env files are very very important.
 
 services:
+  # PostgreSQL database — stores nodes, restaurants, orders, bots, and simulation state
   db:
     image: postgres:15
     container_name: eagroute_db
@@ -19,6 +22,8 @@ services:
       timeout: 5s
       retries: 5
 
+
+  # FastAPI backend — handles simulation logic, pathfinding, and order CRUD
   backend:
     build:
       context: ./backend
@@ -36,10 +41,12 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+      # this is how CSV files (nodes, edges, restaurants) get into the backend container
       - ./data:/app/data
     # hot reload for dev
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # Next.js frontend — the interactive dashboard with map visualization and order management
   frontend:
     build:
       context: ./frontend

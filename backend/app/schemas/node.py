@@ -1,4 +1,4 @@
-# node schemas - request/response models for grid nodes
+# schemas for grid nodes -- address is a human-readable label like "A1" derived from (x, y) coords
 
 from pydantic import BaseModel
 

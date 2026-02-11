@@ -1,3 +1,6 @@
+// Main dashboard page — ties together the interactive map visualization, order CRUD form,
+// simulation controls, bot status, and data streaming (polling) for real-time order updates.
+// This is the single-page UI that satisfies the assignment's frontend requirements.
 "use client";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
@@ -12,7 +15,7 @@ const LEFT_W = 300;
 const RIGHT_W = 370;
 const COMPACT_BREAKPOINT = 1100; // below this → single column
 
-// ─── tiny reusable components ────────────────────────────────────────
+// ─── tiny reusable UI components ─────────────────────────────────────
 function Dot({ color, pulse }: { color: string; pulse?: boolean }) {
   return (
     <span
@@ -47,7 +50,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── status badge ────────────────────────────────────────────────────
+// ─── status badge — color-coded pill for order status ────────────────
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   DELIVERED:  { bg: "rgba(52,211,153,0.10)",  text: "var(--green)",      border: "rgba(52,211,153,0.25)" },
   PICKED_UP:  { bg: "rgba(251,191,36,0.10)",  text: "var(--amber)",      border: "rgba(251,191,36,0.25)" },
@@ -101,8 +104,9 @@ function Btn({ onClick, label, color, disabled }: { onClick: () => void; label: 
   );
 }
 
-// ─── shared section renderers (used in both layouts) ─────────────────
+// ─── shared section renderers (used in both compact and desktop layouts) ──
 
+// simulation controls — start/stop/tick/reset + auto-tick toggle
 function SimControlsContent({ isRunning, autoRun, setAutoRun, handleStart, handleStop, handleTick, handleReset }: {
   isRunning: boolean; autoRun: boolean; setAutoRun: (v: boolean) => void;
   handleStart: () => void; handleStop: () => void; handleTick: () => void; handleReset: () => void;
@@ -130,6 +134,7 @@ function SimControlsContent({ isRunning, autoRun, setAutoRun, handleStart, handl
   );
 }
 
+// order CRUD form (assignment requirement) — pick a restaurant + delivery house, then create
 function NewOrderContent({ grid, selectedRestaurant, setSelectedRestaurant, selectedDelivery, setSelectedDelivery, handleCreate }: {
   grid: GridType; selectedRestaurant: number; setSelectedRestaurant: (v: number) => void;
   selectedDelivery: number; setSelectedDelivery: (v: number) => void; handleCreate: () => void;
@@ -156,6 +161,7 @@ function NewOrderContent({ grid, selectedRestaurant, setSelectedRestaurant, sele
   );
 }
 
+// bot roster — shows each bot's position, status, and what order it's handling
 function BotsContent({ bots }: { bots: Bot[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -185,6 +191,7 @@ function BotsContent({ bots }: { bots: Bot[] }) {
   );
 }
 
+// quick stats bar — total / pending / active / delivered order counts
 function StatsRow({ status }: { status: SimulationStatus }) {
   return (
     <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
@@ -203,6 +210,7 @@ function StatsRow({ status }: { status: SimulationStatus }) {
   );
 }
 
+// order list with filter tabs (ALL / ACTIVE / DELIVERED) — data streaming for order status
 function OrdersList({ filteredOrders, orders, orderFilter, setOrderFilter }: {
   filteredOrders: Order[]; orders: Order[];
   orderFilter: "ALL" | "ACTIVE" | "DELIVERED"; setOrderFilter: (v: "ALL" | "ACTIVE" | "DELIVERED") => void;
@@ -249,7 +257,7 @@ function OrdersList({ filteredOrders, orders, orderFilter, setOrderFilter }: {
   );
 }
 
-// ─── main app ────────────────────────────────────────────────────────
+// ─── main app — wires up state, polling, and both responsive layouts ─
 export default function Home() {
   const [grid, setGrid] = useState<GridType | null>(null);
   const [bots, setBots] = useState<Bot[]>([]);
@@ -279,18 +287,23 @@ export default function Home() {
     setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()} — ${msg}`]);
   }, []);
 
+  // fetch the grid once on mount — this gives us the map layout for the interactive visualization
   useEffect(() => { api.getGrid().then((g) => { setGrid(g); if (g.restaurants.length) setSelectedRestaurant(g.restaurants[0].id); if (g.delivery_points.length) setSelectedDelivery(g.delivery_points[0].id); }); }, []);
 
+  // data streaming via polling — every second we grab bot positions, orders, and sim status
+  // this is our "real-time" update loop (assignment requirement: data streaming for order status)
   useEffect(() => {
     let alive = true;
     const poll = async () => { if (!alive) return; try { const [b, o, s] = await Promise.all([api.getBotPositions(), api.getOrders(), api.getStatus()]); if (!alive) return; setBots(b.bots || []); setOrders(o); setStatus(s); } catch (e) { console.error(e); } };
     poll(); const id = setInterval(poll, 1000); return () => { alive = false; clearInterval(id); };
   }, []);
 
+  // auto-tick: when enabled, fires a tick every second so the simulation runs continuously
   useEffect(() => { if (!autoRun) return; const id = setInterval(() => api.tick(), 1000); return () => clearInterval(id); }, [autoRun]);
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [logs]);
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), 5000); return () => clearTimeout(id); }, [toast]);
 
+  // order creation handler — posts to the backend and shows a toast on failure
   const handleCreate = async () => {
     if (!selectedRestaurant || !selectedDelivery) return;
     try {
@@ -299,7 +312,7 @@ export default function Home() {
       log(`Order created — ${rName} → delivery node ${selectedDelivery}`);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to create order";
-      // extract the detail from the JSON body if present
+      // extract the detail from the JSON body if present (backend sends {"detail": "..."})
       const detailMatch = msg.match(/"detail"\s*:\s*"([^"]+)"/);
       setToast({ msg: detailMatch ? detailMatch[1] : msg, type: "error" });
       log(`Order failed — ${detailMatch ? detailMatch[1] : msg}`);
@@ -316,7 +329,7 @@ export default function Home() {
     return true;
   });
 
-  // compute optimal cell size based on available space
+  // compute optimal cell size so the grid fits nicely in whatever screen size we have
   const cellSize = useMemo(() => {
     if (!grid) return 56;
     const xs = grid.nodes.map((n) => n.x);
@@ -393,9 +406,11 @@ export default function Home() {
       <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", whiteSpace: "nowrap" }}>Quick start:</span>
       <span style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
         <strong>1.</strong> Create order → <Kbd>+ Order</Kbd>
-        &nbsp;&nbsp;<strong>2.</strong> <Kbd>▶ Start</Kbd> or <Kbd>→ Tick</Kbd>
+        &nbsp;&nbsp;<strong>2.</strong> <Kbd>Click ▶ Start</Kbd> and then <Kbd>Click → Tick for one second</Kbd>
         &nbsp;&nbsp;<strong>3.</strong> Watch bots
         &nbsp;&nbsp;<strong>4.</strong> <Kbd>Auto</Kbd> for continuous ticking
+        &nbsp;&nbsp;<strong>5.</strong> <Kbd>Reset</Kbd> to bring all bots to the inital start(0,0)
+
       </span>
       <button onClick={() => setShowGuide(false)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 6px", marginLeft: "auto", flexShrink: 0 }} aria-label="Dismiss guide">×</button>
     </div>

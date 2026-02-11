@@ -1,6 +1,4 @@
-# order status history - audit trail for order state changes
-# the actual postgres triggers that populate this table live in
-# alembic/versions/002_add_order_status_triggers.py
+# order status history — audit trail for order state changes, populated by postgres triggers in alembic/versions/002_add_order_status_triggers.py
 
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func
 from sqlalchemy.orm import relationship

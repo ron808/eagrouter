@@ -1,4 +1,4 @@
-# grid schemas - the big combined response for the frontend map
+# the combined payload the frontend uses to draw the entire interactive map (nodes, restaurants, edges, delivery points)
 
 from pydantic import BaseModel
 from typing import List

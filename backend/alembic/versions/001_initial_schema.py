@@ -15,7 +15,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Nodes table
+    # grid nodes -- every intersection on the town map, loaded from sample_data.csv
     op.create_table(
         "nodes",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -25,7 +25,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_node_coordinates", "nodes", ["x", "y"], unique=True)
 
-    # Restaurants table
+    # restaurants -- the 4 pickup locations (RAMEN, CURRY, PIZZA, SUSHI) where bots collect food
     op.create_table(
         "restaurants",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -33,7 +33,7 @@ def upgrade() -> None:
         sa.Column("node_id", sa.Integer(), sa.ForeignKey("nodes.id"), nullable=False, unique=True),
     )
 
-    # Bots table
+    # delivery bots -- 5 autonomous robots that carry orders around the grid (max 3 orders each per spec)
     op.create_table(
         "bots",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -43,7 +43,7 @@ def upgrade() -> None:
         sa.Column("max_capacity", sa.Integer(), nullable=False, server_default="3"),
     )
 
-    # Orders table
+    # orders -- tracks each delivery from creation to completion (CRUD as per the assignment scope)
     op.create_table(
         "orders",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -60,7 +60,7 @@ def upgrade() -> None:
     op.create_index("ix_orders_status", "orders", ["status"])
     op.create_index("ix_orders_bot_id", "orders", ["bot_id"])
 
-    # Blocked edges table
+    # blocked edges -- impassable paths from BlockedPaths.csv that force bots to find alternate routes
     op.create_table(
         "blocked_edges",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -70,7 +70,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_blocked_edge_lookup", "blocked_edges", ["from_node_id", "to_node_id"])
 
-    # Order status history table
+    # audit trail for order status changes -- auto-populated by postgres triggers (advanced DB concept)
     op.create_table(
         "order_status_history",
         sa.Column("id", sa.Integer(), primary_key=True),

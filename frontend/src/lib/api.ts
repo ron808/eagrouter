@@ -1,3 +1,7 @@
+// API client for talking to the FastAPI backend.
+// We use polling (setInterval in page.tsx) instead of websockets for "data streaming" —
+// it's simpler and still gives us near-real-time order status updates every second.
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 // helper that checks the response before parsing json
