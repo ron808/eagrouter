@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+
+# build output
+.next/
+out/
+build/
+
+# env
+.env
+.env.*
+!.env.example
+
+# ide / os
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# python venv
+venv/
+.venv/
+
+# misc
+*.log
+npm-debug.log*
+package-lock.json
