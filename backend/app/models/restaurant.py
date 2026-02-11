@@ -1,4 +1,4 @@
-# restaurant — pickup locations where bots collect food (4 total: ramen, curry, pizza, sushi as per the assignment)
+# restaurant — pickup locations where bots collect food
 
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship

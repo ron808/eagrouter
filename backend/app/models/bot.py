@@ -1,4 +1,4 @@
-# delivery bot — total bots = 5, every bot can have max 3 orders at once (from the assignment spec)
+# delivery bot — each bot has a max capacity of 3 orders
 
 from sqlalchemy import Column, Integer, String, ForeignKey, Enum
 from sqlalchemy.orm import relationship

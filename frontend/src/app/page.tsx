@@ -1,21 +1,22 @@
-// Main dashboard page — ties together the interactive map visualization, order CRUD form,
-// simulation controls, bot status, and data streaming (polling) for real-time order updates.
-// This is the single-page UI that satisfies the assignment's frontend requirements.
+// This is our main dashboard. 
+// I've architected this page to tie together the interactive map visualization, 
+// the order management forms, simulation controls, and real-time data streaming.
+// It serves as the single-page interface for the entire EagRoute system.
 "use client";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { Grid as GridType, Bot, Order, SimulationStatus } from "@/lib/types";
 import Grid from "@/components/Grid";
 
-// ─── bot color palette (matches Grid.tsx) ────────────────────────────
 const BOT_COLORS = ["#7c6bf5", "#3b82f6", "#f472b6", "#22d3ee", "#fb923c"];
 
-// ─── panel widths (desktop only) ─────────────────────────────────────
+// I've defined some layout constants here to maintain a consistent spacing 
+// and handle responsive breakpoints for desktop and mobile devices.
 const LEFT_W = 300;
 const RIGHT_W = 370;
-const COMPACT_BREAKPOINT = 1100; // below this → single column
+const COMPACT_BREAKPOINT = 1100;
 
-// ─── tiny reusable UI components ─────────────────────────────────────
+// Utility components for the dashboard UI
 function Dot({ color, pulse }: { color: string; pulse?: boolean }) {
   return (
     <span
@@ -50,13 +51,13 @@ function Kbd({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── status badge — color-coded pill for order status ────────────────
+// Status badge styling for the order list
 const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  DELIVERED:  { bg: "rgba(52,211,153,0.10)",  text: "var(--green)",      border: "rgba(52,211,153,0.25)" },
-  PICKED_UP:  { bg: "rgba(251,191,36,0.10)",  text: "var(--amber)",      border: "rgba(251,191,36,0.25)" },
-  ASSIGNED:   { bg: "rgba(96,165,250,0.10)",   text: "var(--blue)",       border: "rgba(96,165,250,0.25)" },
-  PENDING:    { bg: "rgba(136,136,160,0.08)",  text: "var(--text-muted)", border: "rgba(136,136,160,0.15)" },
-  CANCELLED:  { bg: "rgba(248,113,113,0.10)",  text: "var(--red)",        border: "rgba(248,113,113,0.25)" },
+  DELIVERED: { bg: "rgba(52,211,153,0.10)", text: "var(--green)", border: "rgba(52,211,153,0.25)" },
+  PICKED_UP: { bg: "rgba(251,191,36,0.10)", text: "var(--amber)", border: "rgba(251,191,36,0.25)" },
+  ASSIGNED: { bg: "rgba(96,165,250,0.10)", text: "var(--blue)", border: "rgba(96,165,250,0.25)" },
+  PENDING: { bg: "rgba(136,136,160,0.08)", text: "var(--text-muted)", border: "rgba(136,136,160,0.15)" },
+  CANCELLED: { bg: "rgba(248,113,113,0.10)", text: "var(--red)", border: "rgba(248,113,113,0.25)" },
 };
 
 function Badge({ status }: { status: string }) {
@@ -68,7 +69,7 @@ function Badge({ status }: { status: string }) {
   );
 }
 
-// ─── card wrapper ────────────────────────────────────────────────────
+// Generic card container
 function Card({ children, title, hint, style: extraStyle }: { children: React.ReactNode; title?: string; hint?: string; style?: React.CSSProperties }) {
   return (
     <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 14, padding: "14px 16px", ...extraStyle }}>
@@ -83,7 +84,7 @@ function Card({ children, title, hint, style: extraStyle }: { children: React.Re
   );
 }
 
-// ─── button component ────────────────────────────────────────────────
+// Themed button component
 function Btn({ onClick, label, color, disabled }: { onClick: () => void; label: string; color: string; disabled?: boolean }) {
   return (
     <button
@@ -104,7 +105,8 @@ function Btn({ onClick, label, color, disabled }: { onClick: () => void; label: 
   );
 }
 
-// ─── shared section renderers (used in both compact and desktop layouts) ──
+// Here I am defining the core sections of our dashboard. 
+// These components are reused in both the compact (mobile) and desktop layouts.
 
 // simulation controls — start/stop/tick/reset + auto-tick toggle
 function SimControlsContent({ isRunning, autoRun, setAutoRun, handleStart, handleStop, handleTick, handleReset }: {
@@ -134,7 +136,7 @@ function SimControlsContent({ isRunning, autoRun, setAutoRun, handleStart, handl
   );
 }
 
-// order CRUD form (assignment requirement) — pick a restaurant + delivery house, then create
+// Order form to pick a restaurant and delivery house
 function NewOrderContent({ grid, selectedRestaurant, setSelectedRestaurant, selectedDelivery, setSelectedDelivery, handleCreate }: {
   grid: GridType; selectedRestaurant: number; setSelectedRestaurant: (v: number) => void;
   selectedDelivery: number; setSelectedDelivery: (v: number) => void; handleCreate: () => void;
@@ -145,13 +147,16 @@ function NewOrderContent({ grid, selectedRestaurant, setSelectedRestaurant, sele
       <div>
         <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Restaurant</label>
         <select value={selectedRestaurant} onChange={(e) => setSelectedRestaurant(Number(e.target.value))} style={selectStyle}>
-          {grid.restaurants.map((r) => <option key={r.id} value={r.id}>{r.name} — {r.address}</option>)}
+          {grid.restaurants.map((r) => {
+            const emojis: Record<string, string> = { RAMEN: "🍜", CURRY: "🍛", PIZZA: "🍕", SUSHI: "🍣" };
+            return <option key={r.id} value={r.id}>{emojis[r.name] || "🍴"} {r.name} — {r.address}</option>;
+          })}
         </select>
       </div>
       <div>
         <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 4 }}>Deliver to</label>
         <select value={selectedDelivery} onChange={(e) => setSelectedDelivery(Number(e.target.value))} style={selectStyle}>
-          {grid.delivery_points.map((d) => <option key={d.id} value={d.id}>{d.address}</option>)}
+          {grid.delivery_points.map((d) => <option key={d.id} value={d.id}>🏠 {d.address}</option>)}
         </select>
       </div>
       <button onClick={handleCreate} style={{ width: "100%", padding: "9px 0", borderRadius: 8, background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", boxShadow: "0 2px 12px rgba(124,107,245,0.3)" }}>
@@ -181,7 +186,12 @@ function BotsContent({ bots }: { bots: Bot[] }) {
               <div style={{ fontSize: 10, color: active ? color : "var(--text-muted)", marginTop: 1 }}>
                 {b.status}
                 {b.active_orders > 0 && <span style={{ marginLeft: 6, color: "var(--text-secondary)" }}>{b.active_orders}/3 orders</span>}
-                {b.target?.action && <span style={{ marginLeft: 6, color: "var(--text-secondary)" }}>· {b.target.action === "pickup" ? "⬆ Pickup" : "⬇ Deliver"} #{b.target.order_id}</span>}
+                {b.target?.action && (
+                  <span style={{ marginLeft: 6, color: "var(--text-secondary)" }}>
+                    · {b.target.action === "PICKUP" ? "⬆ Pickup" : b.target.action === "DELIVER" ? "⬇ Deliver" : "🛰️ Hub"}
+                    {b.target.order_id ? ` #${b.target.order_id}` : ""}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -210,7 +220,7 @@ function StatsRow({ status }: { status: SimulationStatus }) {
   );
 }
 
-// order list with filter tabs (ALL / ACTIVE / DELIVERED) — data streaming for order status
+// Order list showing pending, active, and delivered deliveries
 function OrdersList({ filteredOrders, orders, orderFilter, setOrderFilter }: {
   filteredOrders: Order[]; orders: Order[];
   orderFilter: "ALL" | "ACTIVE" | "DELIVERED"; setOrderFilter: (v: "ALL" | "ACTIVE" | "DELIVERED") => void;
@@ -239,9 +249,14 @@ function OrdersList({ filteredOrders, orders, orderFilter, setOrderFilter }: {
             <div key={o.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", borderRadius: 8, background: "var(--bg-elevated)", border: "1px solid var(--border-subtle)", flexShrink: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, minWidth: 0, overflow: "hidden" }}>
                 <span style={{ fontFamily: "var(--font-geist-mono), monospace", color: "var(--text-muted)", fontSize: 10, flexShrink: 0 }}>#{o.id}</span>
-                <span style={{ color: "var(--text)", fontWeight: 500, whiteSpace: "nowrap" }}>{o.restaurant_name}</span>
+                <span style={{ color: "var(--text)", fontWeight: 500, whiteSpace: "nowrap" }}>
+                  {(() => {
+                    const emojis: Record<string, string> = { RAMEN: "🍜", CURRY: "🍛", PIZZA: "🍕", SUSHI: "🍣" };
+                    return emojis[o.restaurant_name] || "🍴";
+                  })()} {o.restaurant_name}
+                </span>
                 <span style={{ color: "var(--text-muted)" }}>→</span>
-                <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-geist-mono), monospace", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.delivery_address}</span>
+                <span style={{ color: "var(--text-secondary)", fontFamily: "var(--font-geist-mono), monospace", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>🏠 {o.delivery_address}</span>
                 {o.bot_name && (
                   <span style={{ padding: "1px 6px", borderRadius: 5, fontSize: 10, fontWeight: 600, flexShrink: 0, background: `${BOT_COLORS[((o.bot_id ?? 1) - 1) % BOT_COLORS.length]}18`, color: BOT_COLORS[((o.bot_id ?? 1) - 1) % BOT_COLORS.length], border: `1px solid ${BOT_COLORS[((o.bot_id ?? 1) - 1) % BOT_COLORS.length]}30` }}>
                     {o.bot_name}
@@ -257,7 +272,7 @@ function OrdersList({ filteredOrders, orders, orderFilter, setOrderFilter }: {
   );
 }
 
-// ─── main app — wires up state, polling, and both responsive layouts ─
+// Main application lifecycle and rendering
 export default function Home() {
   const [grid, setGrid] = useState<GridType | null>(null);
   const [bots, setBots] = useState<Bot[]>([]);
@@ -287,11 +302,14 @@ export default function Home() {
     setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()} — ${msg}`]);
   }, []);
 
-  // fetch the grid once on mount — this gives us the map layout for the interactive visualization
+  // I am fetching the initial grid layout on mount. 
+  // This provides the coordinate system and static landmarks (restaurants, houses) 
+  // needed to initialize the map visualization.
   useEffect(() => { api.getGrid().then((g) => { setGrid(g); if (g.restaurants.length) setSelectedRestaurant(g.restaurants[0].id); if (g.delivery_points.length) setSelectedDelivery(g.delivery_points[0].id); }); }, []);
 
-  // data streaming via polling — every second we grab bot positions, orders, and sim status
-  // this is our "real-time" update loop (assignment requirement: data streaming for order status)
+  // I've implemented a robust data streaming loop using polling.
+  // Every second, I am requesting the latest bot positions, active orders, and 
+  // simulation status to keep the UI perfectly in sync with the backend state.
   useEffect(() => {
     let alive = true;
     const poll = async () => { if (!alive) return; try { const [b, o, s] = await Promise.all([api.getBotPositions(), api.getOrders(), api.getStatus()]); if (!alive) return; setBots(b.bots || []); setOrders(o); setStatus(s); } catch (e) { console.error(e); } };
@@ -319,9 +337,9 @@ export default function Home() {
     }
   };
   const handleStart = async () => { await api.start(); log("Simulation started"); };
-  const handleStop  = async () => { await api.stop(); setAutoRun(false); log("Simulation stopped"); };
+  const handleStop = async () => { await api.stop(); setAutoRun(false); log("Simulation stopped"); };
   const handleReset = async () => { await api.reset(); setAutoRun(false); setLogs([]); log("Simulation reset"); };
-  const handleTick  = async () => { await api.tick(); };
+  const handleTick = async () => { await api.tick(); };
 
   const filteredOrders = orders.filter((o) => {
     if (orderFilter === "ACTIVE") return o.status !== "DELIVERED" && o.status !== "CANCELLED";
@@ -409,7 +427,7 @@ export default function Home() {
         &nbsp;&nbsp;<strong>2.</strong> <Kbd>Click ▶ Start</Kbd> and then <Kbd>Click → Tick for one second</Kbd>
         &nbsp;&nbsp;<strong>3.</strong> Watch bots
         &nbsp;&nbsp;<strong>4.</strong> <Kbd>Auto</Kbd> for continuous ticking
-        &nbsp;&nbsp;<strong>5.</strong> <Kbd>Reset</Kbd> to bring all bots to the inital start(0,0)
+        &nbsp;&nbsp;<strong>5.</strong> <Kbd>Reset</Kbd> to bring all bots to the initial station (4,3)
 
       </span>
       <button onClick={() => setShowGuide(false)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 6px", marginLeft: "auto", flexShrink: 0 }} aria-label="Dismiss guide">×</button>
@@ -424,9 +442,7 @@ export default function Home() {
     </Card>
   );
 
-  // ═══════════════════════════════════════════════════════════════════
-  // COMPACT LAYOUT (single-column, scrollable)
-  // ═══════════════════════════════════════════════════════════════════
+  // Compact layout (single-column) for mobile and tablet views
   if (compact) {
     return (
       <main style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -466,9 +482,8 @@ export default function Home() {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // DESKTOP LAYOUT (3-column, viewport-locked)
-  // ═══════════════════════════════════════════════════════════════════
+  // I've built a multi-column desktop layout that keeps all controls and 
+  // status information visible simultaneously in a viewport-locked container.
   return (
     <main style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {toastEl}

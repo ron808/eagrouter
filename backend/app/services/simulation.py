@@ -7,13 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.models import Bot, Order, Node, Restaurant
 from app.models.bot import BotStatus
+from app.config import settings
 from app.models.order import OrderStatus
 from app.services.pathfinding import PathfindingService
 
-# per the spec: "Restaurants = Can receive order (3order/30sec)"
+# Restaurants have a cooldown period: 3 orders every 30 seconds
 # so each restaurant can only accept 3 orders within a 30-tick window
-RESTAURANT_ORDER_LIMIT = 3
-RESTAURANT_COOLDOWN_TICKS = 30
+RESTAURANT_ORDER_LIMIT = settings.MAX_RESTAURANT_ORDERS
+RESTAURANT_COOLDOWN_TICKS = settings.RESTAURANT_COOLDOWN_TICKS
 
 
 class SimulationService:
@@ -28,6 +29,10 @@ class SimulationService:
         self._bot_routes: Dict[int, List[int]] = {}
         # each target is (node_id, 'PICKUP'|'DELIVER', order_id)
         self._bot_targets: Dict[int, tuple] = {}
+        
+        # central station node (4,3)
+        self.station_node = self.db.query(Node).filter(Node.x == 4, Node.y == 3).first()
+        self.station_node_id = self.station_node.id if self.station_node else None
 
     def tick(self) -> Dict:
         SimulationService._tick_counter += 1
@@ -45,7 +50,7 @@ class SimulationService:
         self._calculate_bot_routes()
 
         # phase 3: move bots one step and handle any arrivals (pickups/deliveries)
-        # per spec: "No waiting time at pick up location or destination location"
+        # No waiting time at pick up location or destination location
         move_results = self._move_bots()
         results["bots_moved"] = move_results["moved"]
         results["orders_picked_up"] = move_results["picked_up"]
@@ -82,7 +87,7 @@ class SimulationService:
         extra_assignments: Dict[int, int] = {}
 
         for order in pending_orders:
-            # enforce the restaurant rate limit (3order/30sec from spec)
+            # enforced restaurant rate limit (3 orders / 30 seconds)
             if self._get_restaurant_orders_in_window(order.restaurant_id) >= RESTAURANT_ORDER_LIMIT:
                 continue
 
@@ -142,6 +147,10 @@ class SimulationService:
             if bot.id in self._bot_routes and self._bot_routes[bot.id]:
                 continue
 
+            target_node = None
+            action = None
+            target_order = None
+
             orders = self.db.query(Order).filter(
                 Order.bot_id == bot.id,
                 Order.status.in_([OrderStatus.ASSIGNED, OrderStatus.PICKED_UP])
@@ -150,14 +159,19 @@ class SimulationService:
             if not orders:
                 if bot.status != BotStatus.IDLE:
                     bot.status = BotStatus.IDLE
-                continue
+                
+                # if idle and not at station, go to station
+                if self.station_node_id and bot.current_node_id != self.station_node_id:
+                     target_node = self.station_node_id
+                     action = "STATION"
+                     target_order = None
+                     # crucial: must start moving!
+                     bot.status = BotStatus.MOVING
+                else:
+                    continue
 
             assigned_orders = [o for o in orders if o.status == OrderStatus.ASSIGNED]
             picked_up_orders = [o for o in orders if o.status == OrderStatus.PICKED_UP]
-
-            target_node = None
-            action = None
-            target_order = None
 
             if assigned_orders:
                 # head to the closest restaurant to pick up
@@ -218,7 +232,7 @@ class SimulationService:
         return results
 
     def _handle_arrival(self, bot: Bot, results: Dict):
-        # bot reached its target -- pick up or deliver with no waiting time (per spec)
+        # bot reached its target ^ immediate pick up or delivery
         target_info = self._bot_targets.get(bot.id)
         if not target_info:
             return
@@ -257,6 +271,10 @@ class SimulationService:
                 results["delivered"] += 1
 
             bot.status = BotStatus.DELIVERING
+        
+        elif action == "STATION":
+            # just arrived at station, stay idle
+            bot.status = BotStatus.IDLE
 
         # clear target so the bot recalculates its next move on the following tick
         del self._bot_targets[bot.id]

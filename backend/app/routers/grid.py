@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 def to_address(x: int, y: int) -> str:
-    # per the spec: "Address = L(i=0~N, j=0~N) => Ex: Pizza=LR74"
+    # Address format: LR{x}{y}
     # so we turn grid coords into a human-friendly address like LR74
     return f"LR{x}{y}"
 
@@ -32,7 +32,7 @@ def node_to_response(node: Node) -> NodeResponse:
 
 @router.get("", response_model=GridResponse)
 def get_grid(db: Session = Depends(get_db)):
-    # returns everything the frontend needs to draw the map in one shot
+    # returns everything the frontend needs to draw the map
     nodes = db.query(Node).all()
 
     restaurants = db.query(Restaurant).all()

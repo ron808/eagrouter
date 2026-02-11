@@ -33,7 +33,7 @@ def upgrade() -> None:
         sa.Column("node_id", sa.Integer(), sa.ForeignKey("nodes.id"), nullable=False, unique=True),
     )
 
-    # delivery bots -- 5 autonomous robots that carry orders around the grid (max 3 orders each per spec)
+    # delivery bots -- autonomous robots that carry orders around the grid
     op.create_table(
         "bots",
         sa.Column("id", sa.Integer(), primary_key=True),
@@ -43,7 +43,7 @@ def upgrade() -> None:
         sa.Column("max_capacity", sa.Integer(), nullable=False, server_default="3"),
     )
 
-    # orders -- tracks each delivery from creation to completion (CRUD as per the assignment scope)
+    # orders -- tracks each delivery from creation to completion
     op.create_table(
         "orders",
         sa.Column("id", sa.Integer(), primary_key=True),

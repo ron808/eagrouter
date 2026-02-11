@@ -1,4 +1,4 @@
-# grid node — a point on the 10x10 coordinate space (0-9 on each axis), 80 nodes placed on it per the assignment map
+# grid node — a point on the 10x10 coordinate space (0-9 on each axis)
 
 from sqlalchemy import Column, Integer, Boolean, Index
 from sqlalchemy.orm import relationship
@@ -11,7 +11,7 @@ class Node(Base):
     id = Column(Integer, primary_key=True, index=True)
     x = Column(Integer, nullable=False)
     y = Column(Integer, nullable=False)
-    # true for the 14 delivery points (houses) where customers receive orders — address format LR{x}{y} as per requirement
+    # true for the 14 delivery points (houses) where customers receive orders — with address format LR{x}{y}
     is_delivery_point = Column(Boolean, default=False, nullable=False)
 
     restaurant = relationship("Restaurant", back_populates="node", uselist=False)

@@ -1,12 +1,13 @@
-// API client for talking to the FastAPI backend.
-// We use polling (setInterval in page.tsx) instead of websockets for "data streaming" —
-// it's simpler and still gives us near-real-time order status updates every second.
+// I am using this API client to communicate with our FastAPI backend.
+// Instead of complex WebSockets, I decided to go with simple polling (setInterval in page.tsx). (reasoning behind that is simple results, and not a production grade project at this point)
+// This approach is more robust for our current needs and ensures we get near real-time 
+// updates for bot positions and order statuses every second without overcomplicating the stack.
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
-// helper that checks the response before parsing json
-// if the backend returns an error (rate limit, 500, etc) we throw instead
-// of silently passing garbage data to the UI
+// I've added a helper function here to handle response validation. 
+// It's important that we catch backend errors (like rate limits or server issues) early 
+// so the UI doesn't try to render invalid or empty data.
 async function safeFetch(url: string, options?: RequestInit) {
   const res = await fetch(url, options);
   if (!res.ok) {

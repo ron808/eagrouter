@@ -17,9 +17,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
     ]
 
-    # assignment spec: 5 bots with max 3 orders each
+    # Fleet configuration
     TOTAL_BOTS: int = 5
-    BOT_MAX_CAPACITY: int = 3
+    MAX_BOT_CAPACITY: int = 3
+    MAX_RESTAURANT_ORDERS: int = 3
+    RESTAURANT_COOLDOWN_TICKS: int = 30
     # how often the simulation loop ticks (in seconds)
     SIMULATION_TICK_INTERVAL: float = 1.0
 

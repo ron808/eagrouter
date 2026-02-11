@@ -1,6 +1,6 @@
 # EagRoute
 
-Route optimization delivery bot system. Full-stack app for managing autonomous food delivery bots on a 9x9 grid map.
+Route optimization delivery bot system. Full-stack app for managing autonomous food delivery bots on a 9x9(10x10 actually) grid map.
 
 ## Quick start
 
@@ -23,7 +23,7 @@ To reset the database: `docker-compose down -v`
 - A* pathfinding that avoids blocked edges
 - Greedy bot assignment (closest available bot gets the order)
 - Tick-based simulation with real-time map visualization
-- Address format per spec: L(i,j) e.g. Pizza = LR74
+- Address format: L(i,j) e.g. Pizza = LR74
 
 ## Project structure
 

@@ -1,4 +1,4 @@
-# bot endpoints -- per the spec, "Total Bots = 5" and each bot has a capacity and status
+# Bot management endpoints
 # these endpoints let the frontend check on bot positions, capacity, and active orders
 
 from fastapi import APIRouter, Depends, HTTPException

@@ -4,6 +4,7 @@
 import csv
 import os
 from sqlalchemy.orm import Session
+from app.config import settings
 from app.models import Node, Restaurant, Bot, BlockedEdge
 from app.models.bot import BotStatus
 
@@ -29,6 +30,7 @@ def load_nodes(db: Session) -> int:
         reader = csv.DictReader(f)
 
         for row in reader:
+            # Mapping the coordinate system to an address - for example: LR74
             node = Node(
                 id=int(row["id"]),
                 x=int(row["x"]),
@@ -45,7 +47,6 @@ def load_nodes(db: Session) -> int:
 
 def load_restaurants(db: Session) -> int:
     # reads sample_data.csv and creates a restaurant wherever a column (RAMEN, CURRY, etc.) is TRUE
-    # these are the picking-up positions from the spec
     existing_count = db.query(Restaurant).count()
     if existing_count > 0:
         print(f"  Restaurants already loaded ({existing_count})")
@@ -113,14 +114,14 @@ def load_blocked_edges(db: Session) -> int:
 
 
 def create_bots(db: Session, num_bots: int = 5) -> int:
-    # per the spec: "Total Bots = 5" -- creates 5 delivery bots starting near the center of the grid
+    # Bot endpoints for managing fleet capacity and status
     existing_count = db.query(Bot).count()
     if existing_count > 0:
         print(f"  Bots already created ({existing_count})")
         return 0
 
-    # try to place bots near the center so they're roughly equidistant from everything
-    center_node = db.query(Node).filter(Node.x == 4, Node.y == 4).first()
+    # bots start at the central station (4,3)
+    center_node = db.query(Node).filter(Node.x == 4, Node.y == 3).first()
 
     if not center_node:
         center_node = db.query(Node).first()
@@ -134,7 +135,7 @@ def create_bots(db: Session, num_bots: int = 5) -> int:
             name=f"Bot-{i}",
             current_node_id=start_node_id,
             status=BotStatus.IDLE,
-            max_capacity=3
+            max_capacity=settings.MAX_BOT_CAPACITY
         )
         db.add(bot)
         bots_created += 1

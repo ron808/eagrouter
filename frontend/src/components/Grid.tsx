@@ -1,14 +1,15 @@
-// Interactive map visualization (assignment requirement).
-// Renders the grid with nodes, restaurants (food emojis), delivery houses, and animated bots.
-// Each cell shows what's currently on it — a bot, a restaurant, a delivery house, or just an empty node.
 "use client";
 import type { BlockedEdge, Bot, Node, Restaurant } from "@/lib/types";
 
+// This is our main interactive map visualization.
+// I've built this to render the grid, placing nodes, restaurants, delivery houses, and bots in their correct positions.
+// Each cell is dynamic, showing the most relevant information based on what's currently located there.
+
 type StackPos = { x: number; y: number };
 
-// Multiple bots can occupy the same cell at once (e.g. two idle bots at origin).
-// These layouts define how to arrange 1-5 bots inside a single cell so they
-// don't overlap — think of it like a little formation pattern per count.
+// I noticed that multiple bots often occupy the same cell, especially at the starting hub.
+// To prevent them from overlapping and becoming unclickable, I've defined several formations here.
+// These layouts arrange 1 to 5 bots in a clear, visible pattern within a single cell.
 const BOT_STACK_LAYOUTS: Record<number, StackPos[]> = {
   1: [{ x: 0, y: 0 }],
 
@@ -48,7 +49,8 @@ export type GridProps = {
   cellSize?: number; // allow parent to control cell size
 };
 
-// map restaurant name to a food emoji — makes the grid more visual and fun
+// I've mapped each restaurant category to a specific food emoji.
+// This adds a bit of visual flair to the grid and helps users identify pickup points quickly.
 const RESTAURANT_EMOJI: Record<string, string> = {
   RAMEN: "\u{1F35C}",
   CURRY: "\u{1F35B}",
@@ -74,7 +76,9 @@ export default function Grid({
   void blockedEdges; // not rendered yet but accepted as a prop for future use
   const CELL = cellSize;
 
-  // figure out the grid boundaries from node coordinates
+  // First, I am determining the boundaries of our grid by looking at the min/max 
+  // coordinates among all provided nodes. This allows the map to scale dynamically 
+  // if the grid size changes in the backend.
   const xs = nodes.map((n) => n.x);
   const ys = nodes.map((n) => n.y);
   const minX = xs.length ? Math.min(...xs) : 0;
@@ -82,14 +86,17 @@ export default function Grid({
   const minY = ys.length ? Math.min(...ys) : 0;
   const maxY = ys.length ? Math.max(...ys) : 0;
 
-  // build quick lookup maps so we don't scan arrays repeatedly while rendering
+  // I am building lookup maps here for nodes, restaurants, and bots. 
+  // This is a performance optimization that allows us to find what belongs in 
+  // each grid cell in O(1) time during the main render loop.
   const nodeByXY = new Map<string, Node>();
   for (const n of nodes) nodeByXY.set(`${n.x},${n.y}`, n);
 
   const restaurantByNodeId = new Map<number, Restaurant>();
   for (const r of restaurants) restaurantByNodeId.set(r.node_id, r);
 
-  // group bots by node so we can stack them if multiple bots are on the same cell
+  // Grouping bots by node is essential for our stacking logic when multiple 
+  // bots are at the same location.
   const botsByNodeId = new Map<number, Bot[]>();
   for (const b of bots) {
     const existing = botsByNodeId.get(b.current_node_id) || [];
@@ -97,7 +104,9 @@ export default function Grid({
     botsByNodeId.set(b.current_node_id, existing);
   }
 
-  // build a 2D array of rows for rendering — null means empty/no-node cell
+  // I am transforming our node list into a proper 2D grid structure.
+  // This makes it much easier to iterate through rows and columns when rendering 
+  // the CSS grid layout.
   const rows: Array<Array<Node | null>> = [];
   for (let y = minY; y <= maxY; y++) {
     const row: Array<Node | null> = [];
@@ -106,7 +115,9 @@ export default function Grid({
     rows.push(row);
   }
 
-  // scale bot circles and emoji sizes relative to the cell size so it looks good at any zoom
+  // To ensure the UI remains visually balanced, I'm scaling the icons and fonts
+  // based on our dynamic cell size. This ensures the bots look good whether 
+  // we're on a large monitor or a compact screen.
   const botSingle = Math.round(CELL * 0.6);
   const botStacked = Math.round(CELL * 0.4);
   const fontSingle = Math.round(CELL * 0.25);
@@ -117,9 +128,8 @@ export default function Grid({
       <div
         className="grid gap-[3px]"
         style={{
-          gridTemplateColumns: `28px repeat(${
-            maxX - minX + 1
-          }, ${CELL}px) 28px`,
+          gridTemplateColumns: `28px repeat(${maxX - minX + 1
+            }, ${CELL}px) 28px`,
         }}
       >
         {/* top-left empty corner */}
@@ -181,6 +191,10 @@ export default function Grid({
             } else if (isDelivery) {
               bg = "rgba(52, 211, 153, 0.05)";
               border = "rgba(52, 211, 153, 0.15)";
+            } else if (node.x === 4 && node.y === 3) {
+              // Bot Station styling
+              bg = "rgba(124, 107, 245, 0.08)";
+              border = "rgba(124, 107, 245, 0.3)";
             }
 
             return (
@@ -193,11 +207,9 @@ export default function Grid({
                   background: bg,
                   border: `1px solid ${border}`,
                 }}
-                title={`${node.address} (${node.x},${node.y})${
-                  restaurant ? ` - ${restaurant.name}` : ""
-                }${isDelivery ? " - Delivery Point" : ""}${
-                  hasBot ? ` - ${nodeBots.map((b) => b.name).join(", ")}` : ""
-                }`}
+                title={`${node.address} (${node.x},${node.y})${restaurant ? ` - ${restaurant.name}` : ""
+                  }${isDelivery ? " - Delivery Point" : ""}${hasBot ? ` - ${nodeBots.map((b) => b.name).join(", ")}` : ""
+                  }`}
               >
                 {hasBot ? (
                   <div className="relative w-full h-full">
@@ -216,9 +228,8 @@ export default function Grid({
                       return (
                         <div
                           key={bot.id}
-                          className={`absolute flex items-center justify-center rounded-full text-white font-bold ${
-                            isActive ? "bot-active" : ""
-                          }`}
+                          className={`absolute flex items-center justify-center rounded-full text-white font-bold ${isActive ? "bot-active" : ""
+                            }`}
                           style={{
                             width: size,
                             height: size,
@@ -255,6 +266,17 @@ export default function Grid({
                   >
                     {"\u{1F3E0}"}
                   </span>
+                ) : node.x === 4 && node.y === 3 ? (
+                  <span
+                    style={{
+                      fontSize: Math.round(CELL * 0.35),
+                      lineHeight: 1,
+                      color: "var(--accent)",
+                      opacity: 0.8,
+                    }}
+                  >
+                    {"\u{1F6F0}"}
+                  </span>
                 ) : (
                   <span
                     className="w-1 h-1 rounded-full"
@@ -281,6 +303,16 @@ export default function Grid({
         className="flex gap-4 mt-3 justify-center text-[11px]"
         style={{ color: "var(--text-muted)" }}
       >
+        <span className="flex items-center gap-1">
+          <span
+            className="w-2.5 h-2.5 rounded-sm"
+            style={{
+              background: "rgba(124, 107, 245, 0.15)",
+              border: "1px solid rgba(124, 107, 245, 0.4)",
+            }}
+          />
+          Bot Station
+        </span>
         <span className="flex items-center gap-1">{"\u{1F3E0}"} House</span>
         <span className="flex items-center gap-1">
           {"\u{1F355}"} Restaurant

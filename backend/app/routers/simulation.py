@@ -1,6 +1,4 @@
-# simulation control endpoints -- start, stop, reset, and tick the delivery simulation
-# per the spec: "View real-time updates on delivery status"
-# the frontend polls /tick and /bots/positions to show live bot movement on the grid
+# Simulation control endpoints for live bot movement tracking
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -72,7 +70,7 @@ def reset_simulation(db: Session = Depends(get_db)):
     ).update({Order.status: OrderStatus.CANCELLED}, synchronize_session=False)
 
     from app.models import Node
-    start_node = db.query(Node).first()
+    start_node = db.query(Node).filter(Node.x == 4, Node.y == 3).first()
     start_node_id = start_node.id if start_node else None
 
     db.query(Bot).update({

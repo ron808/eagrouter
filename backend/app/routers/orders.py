@@ -1,4 +1,4 @@
-# order CRUD endpoints -- handles Create, Read, Update, Delete as required by the assignment
+# Order management endpoints
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
